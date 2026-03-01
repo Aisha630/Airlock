@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Generated JSON reports; the committed text sample lives in docs/.
+captures/reports/*.json
+
+# Real captures are never committed: a monitor-mode capture contains the
+# MAC address and SSID of every device and network in radio range,
+# including neighbours'. Only the synthetic capture is tracked.
+captures/*.pcap
+captures/*.wcap
+!captures/lab-synthetic.pcap
