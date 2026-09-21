@@ -2,7 +2,7 @@
 
 The type/subtype pair lives in the two-byte Frame Control field at the head
 of every 802.11 MAC header, which is transmitted in the clear even on a
-fully protected network. That is the whole basis of this lab: an observer
+fully protected network. This is the basis of the analyzer: an observer
 who cannot read a single byte of your traffic can still see who is talking
 to whom, when, and what they are doing.
 """
@@ -80,7 +80,7 @@ SUBTYPE_TABLES = {
     TYPE_DATA: DATA_SUBTYPES,
 }
 
-# IEEE 802.11-2020, Table 9-49. Only the codes this lab actually expects to
+# IEEE 802.11-2020, Table 9-49. Only the codes this analyzer expects to
 # see are named; anything else is reported by number.
 REASON_CODES = {
     1: "unspecified",

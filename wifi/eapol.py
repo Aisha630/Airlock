@@ -1,7 +1,7 @@
 """EAPOL-Key parsing and WPA2 four-way handshake tracking.
 
 The four-way handshake is the closest real-world relative of the AKEX
-protocol in the other half of this lab, and the comparison is the point:
+key exchange in the other half of this project. The comparison:
 
     AKEX                          WPA2 four-way handshake
     ----                          -----------------------

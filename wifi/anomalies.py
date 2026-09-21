@@ -20,7 +20,7 @@ SEVERITY_ORDER = {"high": 0, "medium": 1, "low": 2, "info": 3}
 
 # A deauth flood is defined by rate, not by count: a handful of deauths over
 # a long capture is normal roaming. These thresholds are tuned for a small
-# lab capture and are arguments to the detector so they can be re-tuned.
+# capture and are arguments to the detector so they can be re-tuned.
 DEAUTH_WINDOW_SECONDS = 5.0
 DEAUTH_BURST_THRESHOLD = 8
 

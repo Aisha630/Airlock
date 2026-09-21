@@ -1,8 +1,8 @@
 """Command line 802.11 capture analyzer.
 
-    python -m wifi analyze captures/lab-synthetic.pcap
+    python -m wifi analyze captures/synthetic.pcap
     python -m wifi analyze capture.pcap --json report.json
-    python -m wifi synth captures/lab-synthetic.pcap
+    python -m wifi synth captures/synthetic.pcap
 """
 
 import argparse
@@ -347,9 +347,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     analyze.set_defaults(func=cmd_analyze)
 
-    synth = sub.add_parser("synth", help="generate the synthetic lab capture")
+    synth = sub.add_parser("synth", help="generate the synthetic capture")
     synth.add_argument(
-        "output", nargs="?", default="captures/lab-synthetic.pcap",
+        "output", nargs="?", default="captures/synthetic.pcap",
         help="path to write the pcap to",
     )
     synth.set_defaults(func=cmd_synth)

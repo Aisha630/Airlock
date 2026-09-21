@@ -1,43 +1,68 @@
 # Airlock
 
-An 802.11 security lab and authenticated key exchange — two halves of the
-same problem: a key exchange built correctly from the inside, and what a key
-exchange looks like from the outside to someone in radio range.
+An authenticated Diffie-Hellman key exchange and an 802.11 capture
+analyzer, implemented in Python.
 
-1. **`akex/`** — an authenticated Diffie–Hellman key exchange built on
-   HMAC-SHA256 and a hand-written HKDF, with an adversary harness that runs
-   seven attacks against it.
-2. **`wifi/`** — an 802.11 capture analyzer that classifies management,
-   control and data frames, reads advertised security capabilities,
-   reconstructs WPA2 four-way handshakes, and reports anomalies.
+- **`akex/`**: an authenticated key exchange over RFC 3526 MODP groups,
+  with an HKDF-SHA256 key schedule, HMAC-SHA256 transcript authentication,
+  and an authenticated record layer.
+- **`wifi/`**: a capture analyzer that classifies 802.11 frames, parses RSN
+  security capabilities, reconstructs WPA2 four-way handshakes, and reports
+  security findings.
 
-**177 tests**, including the RFC 5869 HKDF vectors and an end-to-end
-analysis against known ground truth.
+Requires Python 3.10+ and Scapy. 177 tests.
+
+## Installation
 
 ```sh
-make setup
-make demo
+make setup        # creates .venv and installs dependencies
+make test         # runs the test suite
+make demo         # runs both components against sample data
 ```
+
+## Usage
+
+```sh
+python -m akex handshake [--psk TEXT] [--group {14,15}]
+python -m akex attacks
+
+python -m wifi synth [OUTPUT]
+python -m wifi analyze PCAP [--json PATH] [--fail-on-high]
+```
+
+`--fail-on-high` returns a non-zero exit status when any high-severity
+finding is reported, for use in an automated check.
 
 ---
 
-## Part 1 — the key exchange
+## Part 1: AKEX key exchange
+
+### Protocol
 
 ```
   Initiator                                        Responder
-      |  1.  group, nonce_i, g^i                       |
+      |  1.  group_id, nonce_i, g^i                    |
       | ---------------------------------------------> |
       |  2.  nonce_r, g^r, tag_r                       |
       | <--------------------------------------------- |
       |  3.  tag_i                                     |
       | ---------------------------------------------> |
-      |          session live, four keys agreed        |
 ```
 
-Plain DH agrees a key with *somebody* and says nothing about who. Each tag
-is an HMAC-SHA256 over the handshake transcript, keyed from a value derived
-from both the DH secret and a pre-shared key — so forging one requires the
-PSK.
+Both parties hold a pre-shared key. Each tag is an HMAC-SHA256 over a hash
+of the handshake transcript, keyed from material derived from both the
+Diffie-Hellman shared secret and the PSK. Producing a valid tag therefore
+requires possession of the PSK and participation in the exchange.
+
+Properties provided:
+
+| Property | Mechanism |
+|---|---|
+| Mutual authentication | HMAC tags over the transcript, keyed via the PSK |
+| Forward secrecy | Ephemeral DH key pairs, discarded after each handshake |
+| Transcript integrity | All fields of messages 1 and 2 hashed into both tags |
+| Downgrade resistance | Group identifier pinned by policy and covered by the transcript |
+| Key separation | Four independent keys via distinct HKDF `info` labels |
 
 ### Key schedule
 
@@ -52,186 +77,230 @@ session_i2r = HKDF-Expand(prk, "AKEX v1 session key i2r" || th, 32)
 session_r2i = HKDF-Expand(prk, "AKEX v1 session key r2i" || th, 32)
 ```
 
-- **PSK in the extract salt** — both the DH secret and the PSK are needed to
-  reach the PRK.
-- **Transcript hash in every label** — keys depend on every handshake byte,
-  so a downgrade changes them.
-- **Distinct labels** — four independent keys from one exchange.
-- **Directional session keys** — a record cannot be reflected back at its
-  sender.
+The PSK is bound into the extract salt, so both the DH secret and the PSK
+are required to derive the PRK. The transcript hash is appended to every
+expansion label, binding all derived keys to the exact handshake observed.
+Session keys are directional, preventing a record from being replayed back
+toward its sender.
+
+HKDF-SHA256 is implemented in `akex/kdf.py` from RFC 5869 and verified
+against the test vectors in that document's Appendix A.
 
 ### Public-key validation
 
-The DH arithmetic is three lines; the rest of `akex/dh.py` is validation,
-which is where finite-field DH actually fails. Both checks run before any
-secret is computed:
+Peer public values are validated in `akex/dh.py` before any shared secret is
+computed:
 
-| Check | Attack it stops |
+| Check | Rejects |
 |---|---|
-| `2 ≤ y ≤ p-2` | `y ∈ {0, 1, p-1}` forces a shared secret the attacker already knows |
-| `y^q mod p == 1` | Elements outside the prime-order subgroup leak a private-key bit per handshake |
+| `2 ≤ y ≤ p-2` | Degenerate values (`0`, `1`, `p-1`) that force a shared secret known to the attacker |
+| `y^q mod p == 1` | Elements outside the prime-order subgroup, which leak one private-key bit per handshake |
 
-Groups are RFC 3526 MODP-2048 and MODP-3072 — safe primes, so one
-exponentiation is a complete subgroup test. Unknown group ids are refused.
+Groups are RFC 3526 MODP-2048 (id 14) and MODP-3072 (id 15). Both moduli are
+safe primes, so a single exponentiation constitutes a complete subgroup
+test. Unrecognised group identifiers are rejected.
+
+### Record layer
+
+`akex/channel.py` provides an authenticated record layer over the derived
+session keys. Each record is tagged with HMAC-SHA256 over a header
+containing the direction, sequence number and payload length, followed by
+the payload. Receivers verify the tag before evaluating the sequence number,
+and require sequence numbers to strictly increase.
+
+This layer provides integrity and authenticity only; it does not provide
+confidentiality. See [Limitations](#limitations).
 
 ### Adversary harness
 
-`make attacks`:
+`python -m akex attacks` executes seven attacks and two controls:
 
-```
-[  BLOCKED] Peer with the wrong PSK
-[  BLOCKED] Single-bit tamper with the handshake transcript (nonce)
-[  BLOCKED] Tamper with an application record in flight
-[  BLOCKED] Replay of a captured valid record
-[  BLOCKED] Machine-in-the-middle without the PSK
-[  BLOCKED] Small-subgroup / degenerate public key
-[  BLOCKED] Downgrade to a weaker DH group
-[SUCCEEDED] Machine-in-the-middle against UNAUTHENTICATED DH (control)
-```
+| Scenario | Result |
+|---|---|
+| Peer with an incorrect PSK | Blocked |
+| Single-bit transcript modification | Blocked |
+| Application record modification | Blocked |
+| Replay of a valid record | Blocked |
+| Machine-in-the-middle without the PSK | Blocked |
+| Small-subgroup or degenerate public key | Blocked |
+| Downgrade to a weaker DH group | Blocked |
+| Honest handshake (control) | Completes, keys agree |
+| Machine-in-the-middle against unauthenticated DH (control) | Succeeds, as expected |
 
-The last line is the point: the same attack against the same code with the
-authentication removed wins completely. Without that control, "7/7 blocked"
-is a claim about nothing.
+The second control runs the same machine-in-the-middle attack against a key
+exchange with authentication removed, establishing that the authentication
+mechanism accounts for the difference in outcome.
 
 ---
 
-## Part 2 — the 802.11 analyzer
+## Part 2: 802.11 analyzer
 
-`python -m wifi analyze <pcap>` — full output in
+`python -m wifi analyze PCAP` accepts any pcap containing 802.11 frames and
+produces a report in six sections. Sample output is committed at
 [`docs/sample-report.txt`](docs/sample-report.txt).
 
-**Frame classification.** The type/subtype pair is in the clear on every
-frame, even on a fully protected network.
+### Frame classification
 
-```
-class          count    share   subtypes
-management        66    47.5%   deauthentication x27, beacon x23, ...
-control           41    29.5%   ack x33, rts x3, cts x3, block-ack x2
-data              32    23.0%   qos-data x24, data x8
-```
+Frames are classified by the type and subtype fields of the Frame Control
+field, which are transmitted unencrypted on all networks. The report gives
+counts and proportions per class, subtype breakdowns, protected-frame
+counts, and retransmission counts.
 
-**Security posture.** The RSN element is parsed by hand from the byte layout
-(IEEE 802.11-2020 §9.4.2.24), including the two MFP bits that decide whether
-deauthentication attacks work:
+### Security capability analysis
 
-```
-LabNet-WPA3  [02:00:00:bb:00:01]
-  security: WPA3-Personal (SAE)
-  ciphers:  group CCMP-128, pairwise CCMP-128
-  MFP:      required (RSN capabilities 0x00c0)
-```
+The RSN information element (IEEE 802.11-2020 §9.4.2.24) and the legacy
+vendor-specific WPA element are parsed in `wifi/rsn.py`, yielding the group
+cipher, pairwise ciphers, AKM suites, RSN capabilities and group management
+cipher. Recognised configurations include WPA1, WPA2-Personal,
+WPA2/WPA3-Enterprise, WPA3-Personal (SAE), OWE, and WPA3/WPA2 transition
+mode. Management frame protection state is derived from bits 6 (MFPR) and 7
+(MFPC) of the RSN capabilities field.
 
-Distinguishes WPA1, WPA2-PSK, Enterprise, WPA3-SAE, OWE, and WPA3/WPA2
-transition mode — the last flagged separately because offering SAE and PSK
-together allows a downgrade to the PSK path.
+### Four-way handshake reconstruction
 
-**Four-way handshakes.** Messages carry no numbers on the wire; they are
-identified from three flag bits in Key Information. M2 and M4 differ only by
-the Secure bit, so an ambiguous capture returns `None` rather than a guess.
+`wifi/eapol.py` parses EAPOL-Key frames and groups them into per-(AP,
+station) handshakes. Message numbers are derived from the Key Ack, Key MIC
+and Secure bits of the Key Information field. Messages 2 and 4 are
+distinguished by the Secure bit; where a capture is ambiguous, the parser
+returns no result rather than inferring one. PMKIDs present in message 1 are
+extracted. Successive handshakes between the same pair are retained
+separately.
 
-```
-  M1  t+  0.627s  AP -> STA  replay counter 1  (ANonce, no MIC yet)
-  M2  t+  0.635s  STA -> AP  replay counter 1  (SNonce + RSN element, MIC)
-  M3  t+  0.642s  AP -> STA  replay counter 2  (install key, encrypted data)
-  M4  t+  0.649s  STA -> AP  replay counter 2  (zero nonce, ack only)
-  note: AP volunteered a PMKID in message 1; this single frame supports an
-        offline dictionary attack with no client interaction
-```
+### Detectors
 
-**Detectors.** Deauthentication floods (sliding window), forgeable
-management frames correlated against the MFP bits, evil twins (same SSID,
-disagreeing security), weak ciphers and open networks, and captured
-offline-attack material. Every finding carries severity, evidence, and the
-benign explanation where one exists.
+| Detector | Method |
+|---|---|
+| Deauthentication flood | Sliding window over frames grouped by source and target, reporting peak rate |
+| Forgeable management frames | Observed deauthentications correlated against advertised MFP state |
+| Evil twin | One SSID advertised by multiple BSSIDs with differing security configurations |
+| Weak configuration | WEP, TKIP, open networks, absent MFP, and transition-mode downgrade exposure |
+| Handshake exposure | Complete four-way handshakes and disclosed PMKIDs |
+
+Findings carry a severity, supporting evidence, and a documented benign
+explanation where one exists.
 
 ---
 
-## AKEX vs. the real thing
+## Validation
+
+### Test suite
+
+177 tests, including:
+
+- HKDF-SHA256 against the RFC 5869 Appendix A test vectors
+- DH group structure, key agreement, and rejection of invalid public keys
+- Handshake agreement, authentication failure modes, and state ordering
+- Record layer integrity, replay, reordering and reflection handling
+- RSN parsing across security generations, including malformed elements
+- EAPOL message identification and handshake tracking
+- End-to-end analysis of a generated capture with known ground truth
+
+### Real capture
+
+The analyzer was additionally validated against 104 seconds of live
+monitor-mode capture (31,708 frames, 41 BSSIDs), which identified three
+defects not exposed by generated data:
+
+1. An information element with a length field overrunning the frame raised
+   an exception that terminated the run. Frame parsing is now bounded per
+   frame, with failures recorded and analysis continuing.
+2. Corrupted beacons were reported as distinct networks, producing 19
+   spurious findings. Frames whose transmitter address has the
+   Individual/Group bit set are structurally invalid under IEEE 802.11 and
+   are now excluded from network discovery (163 such frames in the capture).
+   A minimum-evidence threshold handles the remainder; excluded observations
+   are reported rather than discarded.
+3. The generated capture's frame distribution differs substantially from
+   live traffic:
+
+   | Class | Generated | Live |
+   |---|---|---|
+   | Management | 47.5% | 9.5% |
+   | Control | 29.5% | 45.0% |
+   | Data | 23.0% | 45.5% |
+
+Findings on the live capture fell from 49 (24 high severity) to 14 (2 high
+severity) after these corrections.
+
+Live captures are excluded from version control, as they contain the MAC
+address and SSID of every device within radio range. The generated capture
+in `captures/` is the only tracked capture.
+
+---
+
+## Comparison with deployed protocols
 
 | | AKEX | WPA2 four-way | WPA3-SAE |
 |---|---|---|---|
-| Credential | PSK | PMK from PBKDF2 | password |
-| Key exchange | ephemeral DH | **none** | Dragonfly PAKE |
-| Key schedule | HKDF-SHA256 | PRF-384/512 | HKDF |
-| Authentication | HMAC over transcript | MIC under the KCK | confirm exchange |
-| Forward secrecy | yes | **no** | yes |
-| Offline dictionary attack | yes, on a weak PSK | yes | **no** |
+| Credential | Pre-shared key | PMK from PBKDF2 | Password |
+| Key exchange | Ephemeral DH | None | Dragonfly PAKE |
+| Key derivation | HKDF-SHA256 | PRF-384/512 | HKDF |
+| Authentication | HMAC over transcript | Key MIC under the KCK | Confirm exchange |
+| Forward secrecy | Yes | No | Yes |
+| Offline dictionary resistance | No | No | Yes |
 
-WPA2 derives the PTK from the PMK and two nonces with no key exchange, so a
-recorded handshake plus a later passphrase recovery decrypts the session
-retroactively. AKEX avoids that the way WPA3 does — a fresh exchange per
-session — which is why the analyzer reports every captured handshake as
-exposure.
+WPA2 derives the PTK from the PMK and two nonces without a key exchange, so
+a recorded handshake combined with subsequent passphrase recovery permits
+retrospective decryption. AKEX performs a fresh Diffie-Hellman exchange per
+session, as WPA3-SAE does, and therefore does not share this property.
 
-AKEX does **not** fix the offline dictionary attack on a weak PSK. Fixing
-that needs a PAKE (SAE, OPAQUE). See [`THREAT_MODEL.md`](THREAT_MODEL.md).
-
----
-
-## Validation against a real capture
-
-Developed against the synthetic capture, then run on 104 seconds of real
-monitor-mode capture (31,708 frames, 41 BSSIDs). Three failures, each now
-covered by `tests/test_robustness.py`: a crash on a malformed information
-element; 19 false "open networks" from corrupted beacons, fixed by rejecting
-frames whose transmitter address has the group bit set (structurally
-impossible per IEEE 802.11) plus a minimum-evidence bar; and a synthetic
-frame mix nothing like real air (management 47.5% vs 9.5%).
-
-**49 findings (24 high) → 14 (2 high)**, all survivors genuine.
-
-Real captures are gitignored — they contain the MAC and SSID of every device
-in range. Only the synthetic capture is tracked.
+AKEX remains vulnerable to an offline dictionary attack against a
+low-entropy PSK. Addressing this requires a password-authenticated key
+exchange such as SAE or OPAQUE.
 
 ---
 
-## Running it
+## Limitations
 
-```sh
-make setup        # virtualenv + dependencies
-make test         # 177 tests
-make demo         # handshake, attacks, capture analysis
-
-python -m akex handshake [--group 15]
-python -m akex attacks
-python -m wifi synth captures/lab.pcap
-python -m wifi analyze capture.pcap --json report.json --fail-on-high
-```
-
-`--fail-on-high` exits non-zero on a high-severity finding, so the analyzer
-works as a pipeline check. To analyze your own capture, see
-[`docs/CAPTURE.md`](docs/CAPTURE.md) for monitor-mode setup on macOS and
-Linux.
+- The record layer provides integrity and authenticity only. Adding an AEAD
+  would be confined to `seal` and `open_record` in `akex/channel.py`.
+- No cryptographic primitives are reimplemented. HMAC-SHA256 is taken from
+  the standard library; the protocol constructed around it is the subject of
+  this project.
+- No passphrase recovery, key recovery or payload decryption is performed.
+  The analyzer operates on frame metadata only.
+- Python's arbitrary-precision `pow` is not constant time. Tag comparison
+  uses `hmac.compare_digest`, but a production implementation would require
+  a constant-time bignum library.
+- Detectors are heuristics with documented false-positive modes.
+- All capture work was performed against hardware owned by the author on an
+  isolated network. Deauthentication frames present in the generated capture
+  were never transmitted.
 
 ---
 
-## Layout
+## Project structure
 
 ```
-akex/       params.py  RFC 3526 groups      wifi/   frames.py    classification
-            dh.py      DH + validation              rsn.py       RSN/WPA parser
-            kdf.py     HKDF (RFC 5869)              eapol.py     four-way handshake
-            wire.py    canonical encoding           capture.py   pcap -> frames
-            protocol.py  handshake + keys           anomalies.py detectors
-            channel.py   record layer               synth.py     lab capture
-            attacks.py   adversary harness          analyze.py   CLI
+akex/   params.py     RFC 3526 MODP group definitions
+        dh.py         Diffie-Hellman with public-key validation
+        kdf.py        HKDF-SHA256 (RFC 5869)
+        wire.py       Canonical message encoding, transcript hashing
+        protocol.py   Handshake state machines and key schedule
+        channel.py    Authenticated record layer
+        attacks.py    Adversary simulations
+        cli.py        Command line interface
+
+wifi/   frames.py     Frame classification, reason and status codes
+        rsn.py        RSN and legacy WPA element parser
+        eapol.py      EAPOL-Key parsing, handshake tracking
+        capture.py    pcap ingestion
+        anomalies.py  Detectors
+        synth.py      Generated capture
+        analyze.py    Command line interface
 ```
 
-`THREAT_MODEL.md` has STRIDE tables for both halves. `docs/CAPTURE.md`
-covers capture methodology and lab containment.
+## Documentation
 
----
+- [`THREAT_MODEL.md`](THREAT_MODEL.md): STRIDE analysis for both components,
+  with mitigations mapped to tests, and accepted risks.
+- [`docs/CAPTURE.md`](docs/CAPTURE.md): monitor-mode capture procedure for
+  macOS and Linux, Wireshark filters, and containment procedure.
+- [`docs/sample-report.txt`](docs/sample-report.txt): full analyzer output.
 
-## Scope
+## References
 
-- **The record layer authenticates; it does not encrypt.** Adding an AEAD is
-  confined to two functions; left out deliberately.
-- **No primitive was reimplemented.** HMAC-SHA256 comes from `hmac`. What is
-  built here is the protocol around it — HKDF, key schedule, transcript
-  binding, state machines, record layer.
-- **No passphrase cracking or payload decryption.** Metadata only.
-- **`pow` is not constant time.** Tag comparison uses `compare_digest`, but
-  production would need a constant-time bignum library.
-- **Detectors are heuristics** with documented false-positive modes.
-- **Run against hardware I own on an isolated lab network.** The deauth
-  frames in the synthetic capture were never transmitted.
+- IEEE 802.11-2020, §9.4.2.24 (RSN element), §12.7 (key hierarchy)
+- RFC 5869: HMAC-based Key Derivation Function (HKDF)
+- RFC 3526: MODP Diffie-Hellman groups for IKE
+- RFC 2104: HMAC

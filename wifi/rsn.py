@@ -7,7 +7,7 @@ crucially whether management frames are protected -- which decides whether
 the deauthentication attack in `anomalies.py` would work against it.
 
 Parsed by hand from the byte layout in IEEE 802.11-2020 Section 9.4.2.24
-rather than via a library helper, because the field this lab most cares
+rather than via a library helper, because the field this analyzer most cares
 about -- the two MFP bits in RSN Capabilities -- is exactly the sort of
 detail that a convenience wrapper hides.
 """
@@ -267,7 +267,7 @@ def build_rsn_element(
     mfp_required: bool = False,
     group_mgmt_cipher: int | None = None,
 ) -> bytes:
-    """Build an RSN element body. Used by `synth.py` to generate lab beacons.
+    """Build an RSN element body. Used by `synth.py` to generate beacons.
 
     Having the encoder next to the decoder keeps the two honest: the round
     trip is asserted in `tests/test_rsn.py`.

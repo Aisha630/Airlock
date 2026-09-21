@@ -15,7 +15,7 @@ from akex.protocol import (
 )
 from akex.wire import ConfirmMessage, InitMessage, ResponseMessage, transcript_hash
 
-PSK = b"a pre-shared key for the lab"
+PSK = b"a pre-shared key for testing"
 
 
 def test_handshake_agrees_on_all_four_keys():

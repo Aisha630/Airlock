@@ -2,7 +2,7 @@
 
 Scapy is used for the link-layer dissection only -- pulling the Frame
 Control bits, the address fields and the information elements out of the
-bytes. Everything this lab actually reasons about (classification, RSN
+bytes. Everything this analyzer reasons about (classification, RSN
 capabilities, handshake state, anomalies) is implemented in this package.
 """
 

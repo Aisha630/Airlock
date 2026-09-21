@@ -1,4 +1,4 @@
-"""Generate a synthetic 802.11 capture for the lab.
+"""Generate a synthetic 802.11 capture.
 
 This file exists so the analyzer is reproducible. A real capture from my own
 hardware is the primary artifact (see docs/CAPTURE.md), but a pcap of a home
@@ -10,7 +10,7 @@ the analyzer's output can be checked against known ground truth in the tests.
 
 Everything here is fabricated. No real network, device or handshake is
 represented. Frames carry the right header fields and information elements;
-payloads are filler, because this lab only ever reads metadata.
+payloads are filler, because the analyzer only ever reads metadata.
 
 Scenario, chosen to exercise every detector:
 
@@ -64,9 +64,9 @@ STA_TWO = "02:00:00:22:22:22"
 ATTACKER = "02:00:00:66:66:66"
 BROADCAST = "ff:ff:ff:ff:ff:ff"
 
-SSID_WPA2 = "LabNet-WPA2"
-SSID_WPA3 = "LabNet-WPA3"
-SSID_LEGACY = "LabNet-Legacy"
+SSID_WPA2 = "TestNet-WPA2"
+SSID_WPA3 = "TestNet-WPA3"
+SSID_LEGACY = "TestNet-Legacy"
 
 CHANNEL_FREQUENCIES = {1: 2412, 6: 2437, 11: 2462, 36: 5180}
 
@@ -122,7 +122,7 @@ def _eapol_key(
     """Assemble an EAPOL-Key body per IEEE 802.11-2020 Figure 12-33.
 
     The MIC is filler. Computing a real one needs the PTK, which needs the
-    passphrase -- and this lab deliberately never derives key material from
+    passphrase, and this project deliberately never derives key material from
     a passphrase. The analyzer reads flag bits, counters and nonces, none of
     which depend on the MIC being valid.
     """
@@ -392,6 +392,6 @@ def write_capture(path: str) -> int:
 if __name__ == "__main__":
     import sys
 
-    target = sys.argv[1] if len(sys.argv) > 1 else "captures/lab-synthetic.pcap"
+    target = sys.argv[1] if len(sys.argv) > 1 else "captures/synthetic.pcap"
     count = write_capture(target)
     print(f"wrote {count} frames to {target}")

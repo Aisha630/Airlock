@@ -1,13 +1,13 @@
-# Airlock — threat model
+# Airlock: threat model
 
 Two systems are in scope and they have different adversaries, so they are
-modelled separately. The purpose of this document is to be explicit about
-what is defended, what is deliberately not, and how each claim is tested --
-a security claim without a stated attacker and a test behind it is decoration.
+modelled separately. It states explicitly what is defended, what is not, and how
+each claim is tested. A security claim without a stated attacker and a test
+behind it cannot be evaluated.
 
 ---
 
-## Part 1 — AKEX, the authenticated key exchange
+## Part 1: AKEX, the authenticated key exchange
 
 ### Assets
 
@@ -35,11 +35,11 @@ in a 2048-bit MODP group. Assumed computationally bounded at roughly 2^128.
 | 4 | Tampering | Application data is modified | HMAC-SHA256 over header and payload | `test_any_single_bit_flip_is_detected` |
 | 5 | Tampering | Downgrade to a weaker DH group | Group id pinned by policy and covered by the transcript; unknown ids refused outright | `test_group_downgrade_is_refused`, `test_unknown_group_id_is_refused` |
 | 6 | Tampering | Small-subgroup / degenerate public key forces a known shared secret or leaks exponent bits | Range check plus `y^q mod p == 1` before any secret is computed | `test_degenerate_public_keys_are_rejected`, `test_non_subgroup_public_key_is_rejected` |
-| 7 | Repudiation | Peer denies having participated | Out of scope: symmetric PSK authentication is deniable by construction — either party could have produced any tag. Non-repudiation needs signatures. | — |
+| 7 | Repudiation | Peer denies having participated | Out of scope: symmetric PSK authentication is deniable by construction, since either party could have produced any tag. Non-repudiation requires signatures. | n/a |
 | 8 | Information disclosure | Timing side channel on tag comparison | All comparisons use `hmac.compare_digest` | `test_constant_time_eq` |
 | 9 | Information disclosure | Past sessions decrypted after PSK compromise | Ephemeral DH keys per handshake give forward secrecy | `test_each_handshake_produces_fresh_keys` |
-| 10 | Information disclosure | Application payloads are readable on the wire | **Accepted, not mitigated.** The record layer authenticates only. See "Out of scope" below. | — |
-| 11 | Denial of service | Attacker forces expensive modexp by flooding message 1 | **Accepted.** No cookie or puzzle mechanism. Noted as the main unhandled DoS. | — |
+| 10 | Information disclosure | Application payloads are readable on the wire | **Accepted, not mitigated.** The record layer authenticates only. See "Out of scope" below. | n/a |
+| 11 | Denial of service | Attacker forces expensive modexp by flooding message 1 | **Accepted.** No cookie or puzzle mechanism. Noted as the main unhandled DoS. | n/a |
 | 12 | Elevation of privilege | Record replayed or reflected back at its sender | Sequence number and direction are inside the MAC input; receiver requires strictly increasing sequence | `test_replay_is_rejected`, `test_reflection_is_rejected` |
 | 13 | Elevation of privilege | Responder acts on keys before the initiator authenticates | `confirm()` must succeed before the session is live | `test_initiator_tag_is_checked_by_the_responder` |
 
@@ -63,14 +63,14 @@ in a 2048-bit MODP group. Assumed computationally bounded at roughly 2^128.
 
 ---
 
-## Part 2 — the 802.11 analyzer
+## Part 2: the 802.11 analyzer
 
 ### Adversary and position
 
-A passive observer in radio range with a monitor-mode adapter — which is to
-say, anyone nearby. No association, no credentials, no interaction with the
-network at all. For the deauthentication case the attacker also transmits,
-which needs nothing more than the same adapter.
+A passive observer in radio range with a monitor-mode adapter, requiring no
+association, credentials or interaction with the network. For the
+deauthentication case the attacker also transmits, which requires nothing
+beyond the same adapter.
 
 ### What stays exposed regardless of encryption
 
@@ -95,7 +95,7 @@ need it before any key exists.
 | Threat | Detector | Why it works |
 |---|---|---|
 | Deauthentication flood (DoS, or forcing a handshake capture) | `detect_deauth_flood` | Unprotected deauths are unauthenticated: no MIC, no sequence binding, forgeable by anyone in range |
-| Forgeable management frames | `detect_unprotected_deauth` | Correlates observed deauths against the RSN MFP bits — the same burst means something different on an MFP-required network |
+| Forgeable management frames | `detect_unprotected_deauth` | Correlates observed deauths against the RSN MFP bits : the same burst means something different on an MFP-required network |
 | Evil twin / rogue AP | `detect_evil_twin` | A clone can copy an SSID but not the credential, so its advertised security disagrees |
 | Weak or broken ciphers (WEP, TKIP), open networks | `detect_weak_security` | Read directly from the advertised RSN element |
 | WPA3→WPA2 downgrade exposure | `RSNInfo.generation` | Transition mode offers SAE and PSK together; a client can be pushed onto the PSK path |
@@ -103,26 +103,26 @@ need it before any key exists.
 
 ### Known limitations, stated rather than hidden
 
-- **Heuristics, not proof.** Every detector has a benign explanation, and
-  the report prints it alongside the finding. A deauth burst is also what a
-  rebooting AP looks like.
-- **Spoofed source addresses.** A forged deauth carries the AP's address in
-  `addr2`, so the analyzer attributes it to the AP. Nothing in an
-  unprotected management frame distinguishes the real transmitter — that is
-  precisely the vulnerability. Radiotap signal strength is a weak hint and
-  is not used to make the call.
+- **Heuristics, not proof.** Every detector has a benign explanation, which
+  the report prints alongside the finding. A deauthentication burst is also
+  consistent with an access point rebooting.
+- **Spoofed source addresses.** A forged deauthentication carries the AP's
+  address in `addr2`, so the analyzer attributes it to the AP. Nothing in an
+  unprotected management frame distinguishes the real transmitter, which is
+  the vulnerability itself. Radiotap signal strength is a weak indicator and
+  is not used for attribution.
 - **Single-channel capture.** A monitor-mode adapter hears one channel at a
   time, so activity on other channels is invisible unless hopping.
 - **Metadata only.** No payload decryption is attempted, and no key
   recovery or passphrase cracking is implemented.
-- **Thresholds are tuned for small lab captures** and are parameters, not
+- **Thresholds are tuned for short captures** and are parameters, not
   constants, so they can be re-tuned for a longer capture.
 
 ### Legal and ethical scope
 
 Everything in this repository was built and exercised against hardware I own
-on an isolated lab network. The deauthentication frames in the sample capture
-are synthetic — generated by `wifi/synth.py`, not transmitted. Capturing or
+on an isolated test network. The deauthentication frames in the sample capture
+are synthetic : generated by `wifi/synth.py`, not transmitted. Capturing or
 disrupting networks you do not own or have written authorization to test is
 illegal in most jurisdictions, including under the US Computer Fraud and
-Abuse Act. See `docs/CAPTURE.md` for how the lab was contained.
+Abuse Act. See `docs/CAPTURE.md` for the containment procedure.

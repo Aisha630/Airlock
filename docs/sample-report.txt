@@ -1,10 +1,10 @@
 
 Capture overview
 ================
-file:     captures/lab-synthetic.pcap
+file:     captures/synthetic.pcap
 frames:   139
 duration: 3.10 s
-bytes:    14683 (14.3 KiB)
+bytes:    14710 (14.4 KiB)
 
 Frame classification
 ====================
@@ -21,8 +21,8 @@ total            139   100.0%
 Networks observed
 =================
 
-LabNet-WPA2  [02:00:00:aa:00:01]
---------------------------------
+TestNet-WPA2  [02:00:00:aa:00:01]
+---------------------------------
   channel:  6
   security: WPA2-Personal (PSK)
   ciphers:  group CCMP-128, pairwise CCMP-128
@@ -31,8 +31,8 @@ LabNet-WPA2  [02:00:00:aa:00:01]
   beacons:  6, probe responses: 1
   stations: 02:00:00:11:11:11
 
-LabNet-WPA3  [02:00:00:bb:00:01]
---------------------------------
+TestNet-WPA3  [02:00:00:bb:00:01]
+---------------------------------
   channel:  36
   security: WPA3-Personal (SAE)
   ciphers:  group CCMP-128, pairwise CCMP-128
@@ -42,8 +42,8 @@ LabNet-WPA3  [02:00:00:bb:00:01]
   beacons:  6, probe responses: 0
   stations: 02:00:00:22:22:22
 
-LabNet-Legacy  [02:00:00:cc:00:01]
-----------------------------------
+TestNet-Legacy  [02:00:00:cc:00:01]
+-----------------------------------
   channel:  11
   security: WPA2-Personal (PSK)
   ciphers:  group TKIP, pairwise TKIP/CCMP-128
@@ -51,8 +51,8 @@ LabNet-Legacy  [02:00:00:cc:00:01]
   MFP:      not supported (RSN capabilities 0x0000)
   beacons:  6, probe responses: 0
 
-LabNet-WPA2  [02:00:00:de:ad:01]
---------------------------------
+TestNet-WPA2  [02:00:00:de:ad:01]
+---------------------------------
   channel:  6
   security: Open (no RSN element)
   beacons:  5, probe responses: 0
@@ -62,22 +62,22 @@ Association and authentication sequence
      t+s  frame              transmitter        receiver           detail
 ----------------------------------------------------------------------------------------------------
    0.581  probe-request      02:00:00:11:11:11  ff:ff:ff:ff:ff:ff  ssid="<wildcard/hidden>"
-   0.585  probe-response     02:00:00:aa:00:01  02:00:00:11:11:11  ssid="LabNet-WPA2"
+   0.585  probe-response     02:00:00:aa:00:01  02:00:00:11:11:11  ssid="TestNet-WPA2"
    0.595  authentication     02:00:00:11:11:11  02:00:00:aa:00:01  algo=open-system seq=1 status=0
    0.598  authentication     02:00:00:aa:00:01  02:00:00:11:11:11  algo=open-system seq=2 status=0
-   0.603  assoc-request      02:00:00:11:11:11  02:00:00:aa:00:01  ssid="LabNet-WPA2"
+   0.603  assoc-request      02:00:00:11:11:11  02:00:00:aa:00:01  ssid="TestNet-WPA2"
    0.607  assoc-response     02:00:00:aa:00:01  02:00:00:11:11:11  status=0
    0.855  deauthentication   02:00:00:aa:00:01  02:00:00:11:11:11  reason=7
    0.875  deauthentication   02:00:00:aa:00:01  ff:ff:ff:ff:ff:ff  reason=7
    2.045  authentication     02:00:00:11:11:11  02:00:00:aa:00:01  algo=open-system seq=1 status=0
    2.048  authentication     02:00:00:aa:00:01  02:00:00:11:11:11  algo=open-system seq=2 status=0
-   2.053  assoc-request      02:00:00:11:11:11  02:00:00:aa:00:01  ssid="LabNet-WPA2"
+   2.053  assoc-request      02:00:00:11:11:11  02:00:00:aa:00:01  ssid="TestNet-WPA2"
    2.057  assoc-response     02:00:00:aa:00:01  02:00:00:11:11:11  status=0
    2.398  authentication     02:00:00:22:22:22  02:00:00:bb:00:01  algo=SAE seq=1 status=0
    2.404  authentication     02:00:00:bb:00:01  02:00:00:22:22:22  algo=SAE seq=1 status=0
    2.408  authentication     02:00:00:22:22:22  02:00:00:bb:00:01  algo=SAE seq=2 status=0
    2.412  authentication     02:00:00:bb:00:01  02:00:00:22:22:22  algo=SAE seq=2 status=0
-   2.417  assoc-request      02:00:00:22:22:22  02:00:00:bb:00:01  ssid="LabNet-WPA3"
+   2.417  assoc-request      02:00:00:22:22:22  02:00:00:bb:00:01  ssid="TestNet-WPA3"
    2.421  assoc-response     02:00:00:bb:00:01  02:00:00:22:22:22  status=0
    3.043  deauthentication   02:00:00:66:66:66  02:00:00:11:11:11  reason=1
    3.073  deauthentication   02:00:00:66:66:66  02:00:00:11:11:11  reason=1
@@ -86,8 +86,8 @@ Association and authentication sequence
 WPA four-way handshakes
 =======================
 
-02:00:00:11:11:11 <-> 02:00:00:aa:00:01 ("LabNet-WPA2")
--------------------------------------------------------
+02:00:00:11:11:11 <-> 02:00:00:aa:00:01 ("TestNet-WPA2")
+--------------------------------------------------------
   M1  t+  0.627s  AP -> STA  replay counter 1  (ANonce, no MIC yet)
   M2  t+  0.635s  STA -> AP  replay counter 1  (SNonce + RSN element, MIC present)
   M3  t+  0.642s  AP -> STA  replay counter 2  (install key, encrypted key data, MIC)
@@ -95,8 +95,8 @@ WPA four-way handshakes
   note: complete four-way handshake in 21.3 ms; an observer who records this and later guesses the passphrase can derive the PTK and decrypt the session offline
   note: AP volunteered a PMKID (0123456789abcdef...) in message 1; this single frame is enough for an offline dictionary attack, with no client interaction needed
 
-02:00:00:11:11:11 <-> 02:00:00:aa:00:01 ("LabNet-WPA2")
--------------------------------------------------------
+02:00:00:11:11:11 <-> 02:00:00:aa:00:01 ("TestNet-WPA2")
+--------------------------------------------------------
   M1  t+  2.077s  AP -> STA  replay counter 5  (ANonce, no MIC yet)
   M2  t+  2.085s  STA -> AP  replay counter 5  (SNonce + RSN element, MIC present)
   M3  t+  2.092s  AP -> STA  replay counter 6  (install key, encrypted key data, MIC)
@@ -126,52 +126,52 @@ Security findings
          benign explanation: an access point rebooting, shedding clients under load, or steering a client to another band also emits deauths, though rarely this many this fast from one address
 
 [  HIGH] Forgeable management frames (no MFP)
-         "LabNet-WPA2" (02:00:00:aa:00:01) advertises MFP as not supported, and unprotected deauthentication frames were observed on it; these frames are unauthenticated and can be forged by anyone in range
+         "TestNet-WPA2" (02:00:00:aa:00:01) advertises MFP as not supported, and unprotected deauthentication frames were observed on it; these frames are unauthenticated and can be forged by anyone in range
          - security: WPA2-Personal (PSK)
          - RSN capabilities word: 0x0000
          - remediation: enable 802.11w (PMF) as required, which is mandatory in WPA3 and optional in WPA2
 
 [  HIGH] Open network
-         "LabNet-WPA2" (02:00:00:de:ad:01) advertises no RSN element, so traffic is unencrypted and unauthenticated on the air
+         "TestNet-WPA2" (02:00:00:de:ad:01) advertises no RSN element, so traffic is unencrypted and unauthenticated on the air
          - 5 beacons observed
 
 [  HIGH] PMKID disclosed in EAPOL message 1
-         AP 02:00:00:aa:00:01 ("LabNet-WPA2") included a PMKID in message 1. Because the PMKID is HMAC-SHA1(PMK, "PMK Name" || AP || STA), this one frame supports an offline dictionary attack on the passphrase with no client and no full handshake required
+         AP 02:00:00:aa:00:01 ("TestNet-WPA2") included a PMKID in message 1. Because the PMKID is HMAC-SHA1(PMK, "PMK Name" || AP || STA), this one frame supports an offline dictionary attack on the passphrase with no client and no full handshake required
          - PMKID 0123456789abcdef0123456789abcdef
          - station 02:00:00:11:11:11
          - remediation: WPA3-SAE, or disable PMKID caching on the AP
 
 [  HIGH] Possible evil twin: same SSID, different security
-         "LabNet-WPA2" is advertised by 2 BSSIDs that do not agree on their security configuration; a rogue AP cloning an SSID cannot clone the credential, so it typically advertises weaker or no security
+         "TestNet-WPA2" is advertised by 2 BSSIDs that do not agree on their security configuration; a rogue AP cloning an SSID cannot clone the credential, so it typically advertises weaker or no security
          - 02:00:00:aa:00:01: WPA2-Personal (PSK), 6 beacons, channel 6
          - 02:00:00:de:ad:01: Open (no RSN element), 5 beacons, channel 6
          benign explanation: a deliberate transition-mode deployment, or an AP mid-way through a configuration change, produces the same pattern
 
 [  HIGH] Weak configuration: WPA2-Personal (PSK)
-         "LabNet-Legacy" (02:00:00:cc:00:01): TKIP is offered; it is cryptographically broken and its presence in the group cipher weakens every client
+         "TestNet-Legacy" (02:00:00:cc:00:01): TKIP is offered; it is cryptographically broken and its presence in the group cipher weakens every client
          - group cipher TKIP, pairwise TKIP/CCMP-128, AKM PSK, MFP not supported
 
 [MEDIUM] Complete four-way handshake captured
-         the full handshake between 02:00:00:11:11:11 and 02:00:00:aa:00:01 ("LabNet-WPA2") is in this capture. WPA2 derives the PTK from the PMK and the two nonces with no key exchange, so recovering the passphrase later decrypts this session retroactively -- WPA2-PSK has no forward secrecy
+         the full handshake between 02:00:00:11:11:11 and 02:00:00:aa:00:01 ("TestNet-WPA2") is in this capture. WPA2 derives the PTK from the PMK and the two nonces with no key exchange, so recovering the passphrase later decrypts this session retroactively -- WPA2-PSK has no forward secrecy
          - completed in 21.3 ms
          - ANonce a1a1a1a1a1a1a1a1...
          - SNonce 5151515151515151...
          - remediation: WPA3-SAE runs a Dragonfly key exchange per session, so a later passphrase compromise reveals nothing
 
 [MEDIUM] Complete four-way handshake captured
-         the full handshake between 02:00:00:11:11:11 and 02:00:00:aa:00:01 ("LabNet-WPA2") is in this capture. WPA2 derives the PTK from the PMK and the two nonces with no key exchange, so recovering the passphrase later decrypts this session retroactively -- WPA2-PSK has no forward secrecy
+         the full handshake between 02:00:00:11:11:11 and 02:00:00:aa:00:01 ("TestNet-WPA2") is in this capture. WPA2 derives the PTK from the PMK and the two nonces with no key exchange, so recovering the passphrase later decrypts this session retroactively -- WPA2-PSK has no forward secrecy
          - completed in 21.3 ms
          - ANonce a2a2a2a2a2a2a2a2...
          - SNonce 5252525252525252...
          - remediation: WPA3-SAE runs a Dragonfly key exchange per session, so a later passphrase compromise reveals nothing
 
 [MEDIUM] Weak configuration: WPA2-Personal (PSK)
-         "LabNet-WPA2" (02:00:00:aa:00:01): management frame protection is not supported, so deauthentication and disassociation frames are forgeable
+         "TestNet-WPA2" (02:00:00:aa:00:01): management frame protection is not supported, so deauthentication and disassociation frames are forgeable
          - group cipher CCMP-128, pairwise CCMP-128, AKM PSK, MFP not supported
 
 [MEDIUM] Weak configuration: WPA2-Personal (PSK)
-         "LabNet-Legacy" (02:00:00:cc:00:01): management frame protection is not supported, so deauthentication and disassociation frames are forgeable
+         "TestNet-Legacy" (02:00:00:cc:00:01): management frame protection is not supported, so deauthentication and disassociation frames are forgeable
          - group cipher TKIP, pairwise TKIP/CCMP-128, AKM PSK, MFP not supported
 
 
-JSON report written to captures/reports/lab-synthetic.json
+JSON report written to captures/reports/synthetic.json

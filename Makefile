@@ -1,6 +1,6 @@
 # Airlock -- common tasks.
 PYTHON ?= .venv/bin/python
-CAPTURE ?= captures/lab-synthetic.pcap
+CAPTURE ?= captures/synthetic.pcap
 
 .PHONY: help setup test handshake attacks synth analyze report demo clean
 
@@ -9,7 +9,7 @@ help:
 	@echo "test       run the full test suite"
 	@echo "handshake  run one authenticated Diffie-Hellman handshake"
 	@echo "attacks    run every adversary simulation"
-	@echo "synth      regenerate the synthetic lab capture"
+	@echo "synth      regenerate the synthetic capture"
 	@echo "analyze    analyze \$$CAPTURE (default: $(CAPTURE))"
 	@echo "report     write docs/sample-report.txt and a JSON report"
 	@echo "demo       handshake, attacks, and capture analysis end to end"
@@ -36,9 +36,9 @@ analyze:
 	$(PYTHON) -m wifi analyze $(CAPTURE)
 
 report: synth
-	$(PYTHON) -m wifi analyze $(CAPTURE) --json captures/reports/lab-synthetic.json \
+	$(PYTHON) -m wifi analyze $(CAPTURE) --json captures/reports/synthetic.json \
 		> docs/sample-report.txt
-	@echo "wrote docs/sample-report.txt and captures/reports/lab-synthetic.json"
+	@echo "wrote docs/sample-report.txt and captures/reports/synthetic.json"
 
 demo: handshake attacks analyze
 

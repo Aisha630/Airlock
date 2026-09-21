@@ -1,4 +1,4 @@
-"""Command line entry point for the key-exchange half of the lab.
+"""Command line entry point for the key exchange.
 
     python -m akex handshake     run a handshake and use the session
     python -m akex attacks       run every adversary simulation
@@ -65,7 +65,7 @@ def cmd_handshake(args: argparse.Namespace) -> int:
     print(_rule("Authenticated session"))
     sender = AuthenticatedChannel.for_initiator(initiator_keys)
     receiver = AuthenticatedChannel.for_responder(responder_keys)
-    for text in (b"lab message one", b"lab message two"):
+    for text in (b"application message one", b"application message two"):
         record = sender.seal(text)
         delivered = receiver.open_record(record)
         print(f"  seq {receiver.recv_seq - 1}: {len(record):>3} bytes on the wire "
@@ -117,7 +117,7 @@ def main(argv: list[str] | None = None) -> int:
 
     handshake = sub.add_parser("handshake", help="run one handshake and use the session")
     handshake.add_argument(
-        "--psk", default="lab pre-shared key", help="pre-shared key as text"
+        "--psk", default="example pre-shared key", help="pre-shared key as text"
     )
     handshake.add_argument(
         "--group",

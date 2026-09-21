@@ -28,7 +28,7 @@ from wifi.synth import (
 
 @pytest.fixture(scope="module")
 def capture(tmp_path_factory):
-    path = tmp_path_factory.mktemp("captures") / "lab.pcap"
+    path = tmp_path_factory.mktemp("captures") / "sample.pcap"
     write_capture(str(path))
     return load_capture(str(path))
 

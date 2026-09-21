@@ -11,4 +11,4 @@ captures/reports/*.json
 # including neighbours'. Only the synthetic capture is tracked.
 captures/*.pcap
 captures/*.wcap
-!captures/lab-synthetic.pcap
+!captures/synthetic.pcap
