@@ -70,6 +70,15 @@ SSID_LEGACY = "TestNet-Legacy"
 
 CHANNEL_FREQUENCIES = {1: 2412, 6: 2437, 11: 2462, 36: 5180}
 
+# Capability Information, by name. Scapy's `cap` field numbers its bits in
+# its own order (its bit 0 is the wire's bit 8), so a hex literal such as
+# 0x1101 does not mean what the 802.11 standard's bit layout says it does.
+# Naming the flags keeps the encoding honest. Privacy must be set whenever an
+# RSN element is present, and clear on the open evil twin.
+CAP_SECURED = "ESS+privacy+short-preamble"
+CAP_OPEN = "ESS+short-preamble"
+CAP_SECURED_5GHZ = CAP_SECURED + "+short-slot"
+
 # Fabricated nonces and PMKID. Fixed, not random, so the capture is
 # byte-identical on every regeneration and the tests can assert on it.
 ANONCE_1 = bytes.fromhex("a1" * 32)
@@ -105,9 +114,7 @@ def _beacon(bssid: str, ssid: str, channel: int, rsn: bytes | None, signal: int)
     frame = Dot11(
         type=0, subtype=8, addr1=BROADCAST, addr2=bssid, addr3=bssid
     )
-    # cap=0x1101: ESS, Privacy, Short Preamble. Privacy must be set whenever
-    # an RSN element is present, and clear on the open evil twin.
-    capability = 0x1101 if rsn is not None else 0x1001
+    capability = CAP_SECURED if rsn is not None else CAP_OPEN
     body = Dot11Beacon(beacon_interval=100, cap=capability)
     return _radiotap(channel, signal) / frame / body / _elements(ssid, channel, rsn)
 
@@ -227,7 +234,7 @@ def build_capture() -> list:
     emit(_ack(STA_ONE, 6, -38), 0.0001)
     emit(_radiotap(6, -42) / Dot11(type=0, subtype=5, addr1=STA_ONE,
                                    addr2=AP_WPA2, addr3=AP_WPA2)
-         / Dot11ProbeResp(beacon_interval=100, cap=0x1101)
+         / Dot11ProbeResp(beacon_interval=100, cap=CAP_SECURED)
          / _elements(SSID_WPA2, 6, rsn_wpa2), 0.004)
 
     # Open System authentication: WPA2-PSK does not authenticate here at all,
@@ -240,11 +247,11 @@ def build_capture() -> list:
          / Dot11Auth(algo=0, seqnum=2, status=0), 0.003)
     emit(_radiotap(6, -38) / Dot11(type=0, subtype=0, addr1=AP_WPA2,
                                    addr2=STA_ONE, addr3=AP_WPA2)
-         / Dot11AssoReq(cap=0x1101, listen_interval=10)
+         / Dot11AssoReq(cap=CAP_SECURED, listen_interval=10)
          / _elements(SSID_WPA2, 6, rsn_wpa2), 0.005)
     emit(_radiotap(6, -42) / Dot11(type=0, subtype=1, addr1=STA_ONE,
                                    addr2=AP_WPA2, addr3=AP_WPA2)
-         / Dot11AssoResp(cap=0x1101, status=0, AID=1), 0.004)
+         / Dot11AssoResp(cap=CAP_SECURED, status=0, AID=1), 0.004)
 
     # --- 3. Four-way handshake, with a PMKID leaked in message 1 ------------
     _four_way(emit, ANONCE_1, SNONCE_1, include_pmkid=True, counter_base=1)
@@ -286,11 +293,11 @@ def build_capture() -> list:
          / Dot11Auth(algo=0, seqnum=2, status=0), 0.003)
     emit(_radiotap(6, -38) / Dot11(type=0, subtype=0, addr1=AP_WPA2,
                                    addr2=STA_ONE, addr3=AP_WPA2)
-         / Dot11AssoReq(cap=0x1101, listen_interval=10)
+         / Dot11AssoReq(cap=CAP_SECURED, listen_interval=10)
          / _elements(SSID_WPA2, 6, rsn_wpa2), 0.005)
     emit(_radiotap(6, -42) / Dot11(type=0, subtype=1, addr1=STA_ONE,
                                    addr2=AP_WPA2, addr3=AP_WPA2)
-         / Dot11AssoResp(cap=0x1101, status=0, AID=1), 0.004)
+         / Dot11AssoResp(cap=CAP_SECURED, status=0, AID=1), 0.004)
     _four_way(emit, ANONCE_2, SNONCE_2, include_pmkid=False, counter_base=5)
 
     # --- 7. WPA3: SAE authentication on the 5 GHz AP ------------------------
@@ -316,11 +323,11 @@ def build_capture() -> list:
          / Raw(load=b"\x00" * 34), 0.004)
     emit(_radiotap(36, -57) / Dot11(type=0, subtype=0, addr1=AP_WPA3,
                                     addr2=STA_TWO, addr3=AP_WPA3)
-         / Dot11AssoReq(cap=0x1111, listen_interval=10)
+         / Dot11AssoReq(cap=CAP_SECURED_5GHZ, listen_interval=10)
          / _elements(SSID_WPA3, 36, rsn_wpa3), 0.005)
     emit(_radiotap(36, -55) / Dot11(type=0, subtype=1, addr1=STA_TWO,
                                     addr2=AP_WPA3, addr3=AP_WPA3)
-         / Dot11AssoResp(cap=0x1111, status=0, AID=2), 0.004)
+         / Dot11AssoResp(cap=CAP_SECURED_5GHZ, status=0, AID=2), 0.004)
     for index in range(4):
         emit(_data(STA_TWO, AP_WPA3, AP_WPA3, from_ds=False, channel=36,
                    signal=-56, size=160), 0.02)

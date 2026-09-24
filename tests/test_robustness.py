@@ -28,7 +28,7 @@ def _beacon(bssid: str, ssid: str = "RealNet"):
         RadioTap()
         / Dot11(type=0, subtype=8, addr1="ff:ff:ff:ff:ff:ff",
                 addr2=bssid, addr3=bssid)
-        / Dot11Beacon(beacon_interval=100, cap=0x1101)
+        / Dot11Beacon(beacon_interval=100, cap="ESS+privacy")
         / Dot11Elt(ID=0, info=ssid.encode())
         / Dot11Elt(ID=48, info=bytes.fromhex(
             "0100000fac040100000fac040100000fac020000"))
@@ -105,15 +105,15 @@ def test_suspect_frames_are_counted_not_silently_dropped(tmp_path):
 def test_truncated_information_element_does_not_abort_the_capture(tmp_path):
     """A beacon with an element whose length byte overruns the frame.
 
-    Scapy represents this as a Dot11Elt with no `info` field, and reading
-    the attribute raises. One such beacon previously killed the entire run.
+    One such beacon previously killed the entire run. The element is now
+    yielded with the bytes that are actually there, and ends the walk.
     """
     good = _beacon("02:00:00:aa:00:01")
     broken = (
         RadioTap()
         / Dot11(type=0, subtype=8, addr1="ff:ff:ff:ff:ff:ff",
                 addr2="02:00:00:cc:00:03", addr3="02:00:00:cc:00:03")
-        / Dot11Beacon(beacon_interval=100, cap=0x1101)
+        / Dot11Beacon(beacon_interval=100, cap="ESS+privacy")
         # Element 0 promises 200 bytes of SSID and supplies three.
         / bytes([0, 200, 0x41, 0x42, 0x43])
     )
@@ -123,6 +123,29 @@ def test_truncated_information_element_does_not_abort_the_capture(tmp_path):
     assert len(capture.frames) == 4
     # The well-formed network survives the bad frame in the middle.
     assert "02:00:00:aa:00:01" in capture.networks
+    assert capture.networks["02:00:00:cc:00:03"].ssid == "ABC"
+
+
+def test_malformed_rsn_element_is_recorded_as_a_parse_error(tmp_path):
+    """A cut-off RSN element must be reported, not silently read as open.
+
+    Scapy dissects the RSN element into a structured layer, and when the
+    element is malformed it falls back to raw bytes. Walking Scapy's element
+    layers therefore skipped the bad element without a trace; elements are
+    now read from the frame bytes, so the parser sees it and says so.
+    """
+    packets = [
+        _beacon("02:00:00:aa:00:01", "BadRSN")
+        for _ in range(2)
+    ]
+    for packet in packets:
+        # Promises two pairwise ciphers and supplies one.
+        packet[Dot11Elt].payload = Dot11Elt(
+            ID=48, info=bytes.fromhex("0100000fac040200000fac04"))
+    capture = load_capture(_write(packets, tmp_path / "bad-rsn.pcap"))
+    assert capture.parse_errors == [
+        "02:00:00:aa:00:01: bad RSN element: pairwise cipher list truncated"
+    ] * 2
 
 
 def test_non_utf8_ssid_is_decoded_without_raising(tmp_path):
@@ -131,7 +154,7 @@ def test_non_utf8_ssid_is_decoded_without_raising(tmp_path):
         RadioTap()
         / Dot11(type=0, subtype=8, addr1="ff:ff:ff:ff:ff:ff",
                 addr2="02:00:00:aa:00:01", addr3="02:00:00:aa:00:01")
-        / Dot11Beacon(beacon_interval=100, cap=0x1101)
+        / Dot11Beacon(beacon_interval=100, cap="ESS+privacy")
         / Dot11Elt(ID=0, info=b"\xff\xfe\x80 binary")
         for _ in range(2)
     ]
@@ -183,7 +206,7 @@ def test_missing_ssid_is_labelled_rather_than_printed_as_none(tmp_path):
         RadioTap()
         / Dot11(type=0, subtype=8, addr1="ff:ff:ff:ff:ff:ff",
                 addr2="02:00:00:aa:00:01", addr3="02:00:00:aa:00:01")
-        / Dot11Beacon(beacon_interval=100, cap=0x1101)
+        / Dot11Beacon(beacon_interval=100, cap="ESS+privacy")
         / Dot11Elt(ID=48, info=bytes.fromhex(
             "0100000fac040100000fac040100000fac020000"))
         for _ in range(3)

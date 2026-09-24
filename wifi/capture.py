@@ -26,7 +26,6 @@ from scapy.layers.dot11 import (  # type: ignore[import-untyped]
     Dot11Beacon,
     Dot11Deauth,
     Dot11Disas,
-    Dot11Elt,
     Dot11ProbeReq,
     Dot11ProbeResp,
     Dot11ReassoReq,
@@ -102,33 +101,45 @@ def _decode_ssid(raw: bytes) -> str:
     return raw.decode("utf-8", errors="replace")
 
 
+# Management frame bodies whose fixed fields are followed by elements.
+_ELEMENT_CARRIERS = (
+    Dot11Beacon, Dot11ProbeResp, Dot11ProbeReq, Dot11AssoReq, Dot11ReassoReq,
+)
+
+
 def _walk_elements(packet):
     """Yield (element_id, body) for every information element in a frame.
+
+    The elements are read from the raw bytes after the frame's fixed fields,
+    not from Scapy's per-element layers. Scapy dissects some elements (RSN
+    among them) into structured subclasses, and when one of those is
+    malformed it gives up and turns the rest of the frame into a Raw layer.
+    Walking its layers would then silently skip the malformed element, which
+    is exactly the one worth reporting: a truncated RSN element must surface
+    as a parse error, not read as an open network.
 
     Defensive by necessity. Information elements come off the air from
     devices this tool does not control, and real captures contain plenty
     that are truncated mid-element, carry a length byte that overruns the
-    frame, or were clipped by the capturing adapter's snap length. Scapy
-    represents those as a `Dot11Elt` with no `info` field at all, and simply
-    reading the attribute raises.
-
-    A frame parser that crashes on malformed input is a denial of service on
-    itself: one bad beacon from any device in range would otherwise abort the
-    analysis of an entire capture. So a broken element ends the walk for that
-    frame and leaves the elements already parsed intact.
+    frame, or were clipped by the capturing adapter's snap length. An element
+    that overruns is yielded with the bytes that are actually there, and it
+    ends the walk, since nothing after it can be located reliably.
     """
-    element = packet.getlayer(Dot11Elt)
-    while element is not None:
-        try:
-            element_id = int(element.ID)
-            info = element.info
-        except (ValueError, AttributeError, TypeError):
+    carrier = next(
+        (packet.getlayer(cls) for cls in _ELEMENT_CARRIERS if packet.haslayer(cls)),
+        None,
+    )
+    if carrier is None:
+        return
+    data = bytes(carrier.payload)
+    offset = 0
+    while offset + 2 <= len(data):
+        element_id, length = data[offset], data[offset + 1]
+        body = data[offset + 2 : offset + 2 + length]
+        yield element_id, body
+        if len(body) < length:
             return
-        yield element_id, bytes(info) if info else b""
-        try:
-            element = element.payload.getlayer(Dot11Elt)
-        except (ValueError, AttributeError, TypeError):
-            return
+        offset += 2 + length
 
 
 def _radiotap_metadata(packet) -> tuple[int | None, int | None]:

@@ -9,11 +9,13 @@ written to produce, and a regression in any parser shows up as a mismatch.
 import json
 
 import pytest
+from scapy.layers.dot11 import Dot11, Dot11Beacon  # type: ignore[import-untyped]
 
 from wifi.analyze import build_json, track_handshakes
 from wifi.anomalies import run_all_detectors
 from wifi.capture import load_capture
 from wifi.synth import (
+    build_capture,
     AP_EVIL_TWIN,
     AP_LEGACY,
     AP_WPA2,
@@ -198,3 +200,23 @@ def test_json_report_is_serialisable_and_complete(capture, analysis):
     assert len(report["handshakes"]) == 2
     assert report["handshakes"][0]["pmkid"] == PMKID.hex()
     assert report["findings"]
+
+
+def test_beacons_advertise_privacy_only_when_secured():
+    """Capability Information on the wire: Privacy (bit 4) iff RSN is present.
+
+    Read from the built bytes rather than through Scapy's `cap` field, whose
+    bit numbering differs from the standard's; that difference is how the
+    open evil twin once advertised Privacy without anyone noticing.
+    """
+    checked = 0
+    for packet in build_capture():
+        if not packet.haslayer(Dot11Beacon):
+            continue
+        body = bytes(packet[Dot11Beacon])
+        capability = int.from_bytes(body[10:12], "little")
+        assert capability & 0x0001, "ESS bit clear"
+        secured = packet[Dot11].addr2 != AP_EVIL_TWIN
+        assert bool(capability & 0x0010) == secured, packet[Dot11].addr2
+        checked += 1
+    assert checked == 23
